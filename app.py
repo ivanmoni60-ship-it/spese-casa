@@ -8,7 +8,7 @@ st.set_page_config(
     page_title="Gestione Spese di Casa", page_icon="🏠", layout="wide"
 )
 
-# Connessione sicura a Supabase dai Secrets
+# Connessione sicura a Supabase
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
@@ -86,33 +86,66 @@ if not spese_data:
 else:
     st.subheader(f"📋 Elenco Spese {anno_selezionato}")
 
+    # Intestazione Tabella su singola riga
+    col_serv, col_per, col_cost, col_quot, col_data, col_pag, col_del = (
+        st.columns([2.5, 2.5, 1.5, 1.5, 1.5, 1.5, 0.8])
+    )
+
+    with col_serv:
+        st.markdown("**Servizio**")
+    with col_per:
+        st.markdown("**Periodo**")
+    with col_cost:
+        st.markdown("**Totale**")
+    with col_quot:
+        st.markdown("**Quota 25%**")
+    with col_data:
+        st.markdown("**Data**")
+    with col_pag:
+        st.markdown("**Pagato S/N**")
+    with col_del:
+        st.markdown("**Elimina**")
+
+    st.markdown("---")
+
+    # Righe di dati compatte su singola riga
     for spesa in spese_data:
-        col_info, col_costi, col_stato = st.columns([3, 2, 2])
+        col_serv, col_per, col_cost, col_quot, col_data, col_pag, col_del = (
+            st.columns([2.5, 2.5, 1.5, 1.5, 1.5, 1.5, 0.8])
+        )
 
         data_it = datetime.datetime.strptime(
             spesa["data_inserimento"], "%Y-%m-%d"
         ).strftime("%d/%m/%Y")
         stato_attuale = spesa["pagata"]
 
-        with col_info:
-            st.markdown(f"**{spesa['servizio']}**")
-            st.caption(f"Periodo: {spesa['periodo']} | Data: {data_it}")
+        with col_serv:
+            st.write(spesa["servizio"])
+        with col_per:
+            st.write(spesa["periodo"])
+        with col_cost:
+            st.write(f"€ {spesa['costo_totale']:.2f}")
+        with col_quot:
+            st.write(f"€ {spesa['quota_figlio']:.2f}")
+        with col_data:
+            st.write(data_it)
 
-        with col_costi:
-            st.markdown(f"Totale: **€ {spesa['costo_totale']:.2f}**")
-            st.caption(f"Quota Figlio (25%): **€ {spesa['quota_figlio']:.2f}**")
-
-        with col_stato:
-            colore_btn = (
-                "🟢 PAGATO (S)" if stato_attuale == "S" else "🔴 DA PAGARE (N)"
-            )
+        # Clicca sul pulsante per passare da S a N o viceversa
+        with col_pag:
+            testo_btn = "🟢 S" if stato_attuale == "S" else "🔴 N"
             if st.button(
-                colore_btn, key=f"btn_{spesa['id']}", use_container_width=True
+                testo_btn, key=f"btn_pag_{spesa['id']}", use_container_width=True
             ):
                 nuovo_stato = "N" if stato_attuale == "S" else "S"
                 supabase.table("spese").update({"pagata": nuovo_stato}).eq(
                     "id", spesa["id"]
                 ).execute()
+                st.rerun()
+
+        # Pulsante Cestino per cancellare la riga
+        with col_del:
+            if st.button("🗑️", key=f"btn_del_{spesa['id']}"):
+                supabase.table("spese").delete().eq("id", spesa["id"]).execute()
                 st.rerun()
 
     st.markdown("---")
