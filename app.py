@@ -21,9 +21,58 @@ st.title("🏠 Gestione Spese di Casa")
 anni_disponibili = [2026, 2025, 2024]
 anno_selezionato = st.selectbox("📅 Seleziona Anno:", anni_disponibili, index=0)
 
+# Lettura dati dal Database Cloud per l'anno selezionato
+res = (
+    supabase.table("spese")
+    .select("*")
+    .eq("anno", anno_selezionato)
+    .order("servizio", desc=False)
+    .order("data_inserimento", desc=False)
+    .execute()
+)
+spese_data = res.data
+
+# -----------------------------------------------------------------------------
+# 2. RIEPILOGO TOTALI E PER TIPOLOGIA (POSIZIONATO ALL'INIZIO)
+# -----------------------------------------------------------------------------
 st.markdown("---")
 
-# 2. Form di inserimento Nuova Spesa
+if spese_data:
+    df_totali = pd.DataFrame(spese_data)
+    tot_complessivo = df_totali["costo_totale"].sum()
+    tot_figlio = df_totali["quota_figlio"].sum()
+
+    st.subheader(f"📊 Riepilogo Totali {anno_selezionato}")
+
+    # Totali Generali
+    col_t1, col_t2 = st.columns(2)
+    col_t1.metric("Totale Complessivo Spese", f"€ {tot_complessivo:.2f}")
+    col_t2.metric("Totale Quota Figlio (25%)", f"€ {tot_figlio:.2f}")
+
+    # Totali divisi per Tipologia/Servizio
+    st.markdown("##### **Dettaglio per Tipologia**")
+    tot_per_servizio = (
+        df_totali.groupby("servizio")[["costo_totale", "quota_figlio"]]
+        .sum()
+        .reset_index()
+    )
+
+    cols_serv = st.columns(len(tot_per_servizio))
+    for idx, row in tot_per_servizio.iterrows():
+        with cols_serv[idx]:
+            st.info(
+                f"**{row['servizio']}**\n\n"
+                f"• Totale: **€ {row['costo_totale']:.2f}**\n\n"
+                f"• Quota 25%: **€ {row['quota_figlio']:.2f}**"
+            )
+else:
+    st.info(f"Nessuna spesa registrata per l'anno {anno_selezionato}.")
+
+st.markdown("---")
+
+# -----------------------------------------------------------------------------
+# 3. FORM DI INSERIMENTO NUOVA SPESA
+# -----------------------------------------------------------------------------
 with st.expander("➕ **Aggiungi Nuova Spesa**", expanded=False):
     with st.form("form_nuova_spesa", clear_on_submit=True):
         col1, col2 = st.columns(2)
@@ -70,21 +119,11 @@ with st.expander("➕ **Aggiungi Nuova Spesa**", expanded=False):
                 st.success("Spesa aggiunta con successo!")
                 st.rerun()
 
-# 3. Lettura dati dal Database Cloud
-res = (
-    supabase.table("spese")
-    .select("*")
-    .eq("anno", anno_selezionato)
-    .order("servizio", desc=False)
-    .order("data_inserimento", desc=False)
-    .execute()
-)
-spese_data = res.data
-
-if not spese_data:
-    st.info(f"Nessuna spesa registrata per l'anno {anno_selezionato}.")
-else:
-    st.subheader(f"📋 Elenco Spese {anno_selezionato}")
+# -----------------------------------------------------------------------------
+# 4. TABELLA DETTAGLIATA SPESE
+# -----------------------------------------------------------------------------
+if spese_data:
+    st.subheader(f"📋 Elenco Spese Dettagliato {anno_selezionato}")
 
     # Intestazione Tabella
     col_serv, col_per, col_cost, col_quot, col_data, col_pag, col_del = (
@@ -157,15 +196,3 @@ else:
                         "id", spesa["id"]
                     ).execute()
                     st.rerun()
-
-    st.markdown("---")
-
-    # 4. Calcolo Totali
-    df = pd.DataFrame(spese_data)
-    tot_complessivo = df["costo_totale"].sum()
-    tot_figlio = df["quota_figlio"].sum()
-
-    st.subheader("📊 Riepilogo Totali")
-    col_t1, col_t2 = st.columns(2)
-    col_t1.metric("Totale Complessivo Spese", f"€ {tot_complessivo:.2f}")
-    col_t2.metric("Totale Quota Figlio (25%)", f"€ {tot_figlio:.2f}")
