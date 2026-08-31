@@ -14,14 +14,7 @@ SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Mappa Colori per i Servizi (Bordi/Badge)
-COLORI_SERVIZI = {
-    "Iren Teleriscaldamento": "🟧 #ff7f0e",
-    "Iren Luce": "🟦 #1f77b4",
-    "Iren Rifiuti": "🟪 #9467bd",
-    "Condominio": "🟩 #2ca02c",
-}
-
+# Mappa Colori/Badge per i Servizi
 BADGE_HTML = {
     "Iren Teleriscaldamento": (
         "<span style='background-color:#fff3e0; color:#e65100;"
@@ -104,14 +97,11 @@ if spese_data:
                 unsafe_allow_html=True,
             )
 
-    # -------------------------------------------------------------------------
-    # NOVITÀ: STRUMENTO "SOMMA SELEZIONATA" (TIPO EXCEL)
-    # -------------------------------------------------------------------------
+    # Strumento Somma Rapida
     st.markdown("<br>", unsafe_allow_html=True)
     with st.expander("🧮 **Calcolatrice Somma Rapida (Tipo Excel)**", expanded=False):
         st.caption("Seleziona una o più spese per vedere la loro somma complessiva e la relativa quota 25%:")
         
-        # Prepariamo le opzioni di selezione
         opzioni_spese = {
             f"[{s['servizio']}] {s['periodo']} - €{s['costo_totale']:.2f} (Quota: €{s['quota_figlio']:.2f})": s
             for s in spese_data
@@ -185,7 +175,7 @@ with st.expander("➕ **Aggiungi Nuova Spesa**", expanded=False):
                 st.rerun()
 
 # -----------------------------------------------------------------------------
-# 4. TABELLA DETTAGLIATA SPESE
+# 4. TABELLA DETTAGLIATA SPESE (CON IMPORTI NON PAGATI IN ROSSO)
 # -----------------------------------------------------------------------------
 if spese_data:
     st.subheader(f"📋 Elenco Spese Dettagliato {anno_selezionato}")
@@ -214,7 +204,7 @@ if spese_data:
 
     st.markdown("---")
 
-    # Righe di dati con Badge colorati per i Servizi
+    # Righe di dati
     for spesa in spese_data:
         col_serv, col_per, col_cost, col_quot, col_data, col_pag, col_edit, col_del = (
             st.columns([2.5, 2.2, 1.3, 1.3, 1.3, 1.5, 0.9, 0.9])
@@ -226,17 +216,28 @@ if spese_data:
         data_it = dt_obj.strftime("%d/%m/%Y")
         stato_attuale = spesa["pagata"]
 
-        # Servizio visibile con il suo badge colorato personalizzato
+        # Formattazione importo: Rosso in grassetto se NON pagato ('N'), normale se pagato ('S')
+        if stato_attuale == "N":
+            txt_costo = f"<span style='color:#d32f2f; font-weight:bold;'>€ {spesa['costo_totale']:.2f}</span>"
+            txt_quota = f"<span style='color:#d32f2f; font-weight:bold;'>€ {spesa['quota_figlio']:.2f}</span>"
+        else:
+            txt_costo = f"€ {spesa['costo_totale']:.2f}"
+            txt_quota = f"€ {spesa['quota_figlio']:.2f}"
+
+        # Servizio con badge
         with col_serv:
             badge_html = BADGE_HTML.get(spesa["servizio"], spesa["servizio"])
             st.markdown(badge_html, unsafe_allow_html=True)
 
         with col_per:
             st.write(spesa["periodo"])
+
+        # Importi con stile dinamico (Rosso se non pagati)
         with col_cost:
-            st.write(f"€ {spesa['costo_totale']:.2f}")
+            st.markdown(txt_costo, unsafe_allow_html=True)
         with col_quot:
-            st.write(f"€ {spesa['quota_figlio']:.2f}")
+            st.markdown(txt_quota, unsafe_allow_html=True)
+
         with col_data:
             st.write(data_it)
 
