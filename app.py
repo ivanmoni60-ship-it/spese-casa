@@ -1,15 +1,18 @@
 import datetime
 import pandas as pd
 import streamlit as st
-from st_supabase_connection import SupabaseConnection
+from supabase import create_client
 
 # Configurazione pagina
 st.set_page_config(
     page_title="Gestione Spese di Casa", page_icon="🏠", layout="wide"
 )
 
-# Connessione al Database Cloud
-conn = st.connection("supabase", type=SupabaseConnection)
+# Connessione sicura a Supabase dai Secrets
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Titolo App
 st.title("🏠 Gestione Spese di Casa")
@@ -63,13 +66,13 @@ with st.expander("➕ **Aggiungi Nuova Spesa**", expanded=False):
                     "data_inserimento": str(data_inserimento),
                     "pagata": "N",
                 }
-                conn.table("spese").insert(nuova_spesa).execute()
+                supabase.table("spese").insert(nuova_spesa).execute()
                 st.success("Spesa aggiunta con successo!")
                 st.rerun()
 
 # 3. Lettura dati dal Database Cloud
 res = (
-    conn.table("spese")
+    supabase.table("spese")
     .select("*")
     .eq("anno", anno_selezionato)
     .order("servizio", desc=False)
@@ -107,7 +110,7 @@ else:
                 colore_btn, key=f"btn_{spesa['id']}", use_container_width=True
             ):
                 nuovo_stato = "N" if stato_attuale == "S" else "S"
-                conn.table("spese").update({"pagata": nuovo_stato}).eq(
+                supabase.table("spese").update({"pagata": nuovo_stato}).eq(
                     "id", spesa["id"]
                 ).execute()
                 st.rerun()
