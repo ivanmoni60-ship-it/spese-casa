@@ -86,9 +86,9 @@ if not spese_data:
 else:
     st.subheader(f"📋 Elenco Spese {anno_selezionato}")
 
-    # Intestazione Tabella su singola riga
+    # Intestazione Tabella
     col_serv, col_per, col_cost, col_quot, col_data, col_pag, col_del = (
-        st.columns([2.5, 2.5, 1.5, 1.5, 1.5, 1.5, 0.8])
+        st.columns([2.5, 2.5, 1.5, 1.5, 1.5, 1.8, 1.2])
     )
 
     with col_serv:
@@ -108,10 +108,10 @@ else:
 
     st.markdown("---")
 
-    # Righe di dati compatte su singola riga
+    # Righe di dati compatte con popover di conferma
     for spesa in spese_data:
         col_serv, col_per, col_cost, col_quot, col_data, col_pag, col_del = (
-            st.columns([2.5, 2.5, 1.5, 1.5, 1.5, 1.5, 0.8])
+            st.columns([2.5, 2.5, 1.5, 1.5, 1.5, 1.8, 1.2])
         )
 
         data_it = datetime.datetime.strptime(
@@ -130,23 +130,33 @@ else:
         with col_data:
             st.write(data_it)
 
-        # Clicca sul pulsante per passare da S a N o viceversa
+        # 1. Popover di conferma cambio stato Pagato (S/N)
         with col_pag:
             testo_btn = "🟢 S" if stato_attuale == "S" else "🔴 N"
-            if st.button(
-                testo_btn, key=f"btn_pag_{spesa['id']}", use_container_width=True
-            ):
-                nuovo_stato = "N" if stato_attuale == "S" else "S"
-                supabase.table("spese").update({"pagata": nuovo_stato}).eq(
-                    "id", spesa["id"]
-                ).execute()
-                st.rerun()
+            nuovo_stato = "N" if stato_attuale == "S" else "S"
+            label_conferma = (
+                "Segnare come NON PAGATA?"
+                if stato_attuale == "S"
+                else "Segnare come PAGATA?"
+            )
 
-        # Pulsante Cestino per cancellare la riga
+            with st.popover(testo_btn, use_container_width=True):
+                st.write(label_conferma)
+                if st.button("Conferma", key=f"conf_pag_{spesa['id']}"):
+                    supabase.table("spese").update(
+                        {"pagata": nuovo_stato}
+                    ).eq("id", spesa["id"]).execute()
+                    st.rerun()
+
+        # 2. Popover di conferma cancellazione riga
         with col_del:
-            if st.button("🗑️", key=f"btn_del_{spesa['id']}"):
-                supabase.table("spese").delete().eq("id", spesa["id"]).execute()
-                st.rerun()
+            with st.popover("🗑️", use_container_width=True):
+                st.write("Eliminare questa spesa?")
+                if st.button("Sì, elimina", key=f"conf_del_{spesa['id']}"):
+                    supabase.table("spese").delete().eq(
+                        "id", spesa["id"]
+                    ).execute()
+                    st.rerun()
 
     st.markdown("---")
 
