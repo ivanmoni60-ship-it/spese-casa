@@ -22,11 +22,13 @@ anni_disponibili = [2026, 2025, 2024]
 anno_selezionato = st.selectbox("📅 Seleziona Anno:", anni_disponibili, index=0)
 
 # Lettura dati dal Database Cloud per l'anno selezionato
+# Ordinamento: Prima per Servizio, poi per Periodo e Data
 res = (
     supabase.table("spese")
     .select("*")
     .eq("anno", anno_selezionato)
     .order("servizio", desc=False)
+    .order("periodo", desc=False)
     .order("data_inserimento", desc=False)
     .execute()
 )
@@ -120,14 +122,14 @@ with st.expander("➕ **Aggiungi Nuova Spesa**", expanded=False):
                 st.rerun()
 
 # -----------------------------------------------------------------------------
-# 4. TABELLA DETTAGLIATA SPESE
+# 4. TABELLA DETTAGLIATA SPESE CON MODIFICA ED ELIMINAZIONE
 # -----------------------------------------------------------------------------
 if spese_data:
     st.subheader(f"📋 Elenco Spese Dettagliato {anno_selezionato}")
 
     # Intestazione Tabella
-    col_serv, col_per, col_cost, col_quot, col_data, col_pag, col_del = (
-        st.columns([2.5, 2.5, 1.5, 1.5, 1.5, 1.8, 1.2])
+    col_serv, col_per, col_cost, col_quot, col_data, col_pag, col_edit, col_del = (
+        st.columns([2.2, 2.2, 1.3, 1.3, 1.3, 1.5, 0.9, 0.9])
     )
 
     with col_serv:
@@ -142,20 +144,23 @@ if spese_data:
         st.markdown("**Data**")
     with col_pag:
         st.markdown("**Pagato S/N**")
+    with col_edit:
+        st.markdown("**Modifica**")
     with col_del:
         st.markdown("**Elimina**")
 
     st.markdown("---")
 
-    # Righe di dati compatte con popover di conferma
+    # Righe di dati compatte
     for spesa in spese_data:
-        col_serv, col_per, col_cost, col_quot, col_data, col_pag, col_del = (
-            st.columns([2.5, 2.5, 1.5, 1.5, 1.5, 1.8, 1.2])
+        col_serv, col_per, col_cost, col_quot, col_data, col_pag, col_edit, col_del = (
+            st.columns([2.2, 2.2, 1.3, 1.3, 1.3, 1.5, 0.9, 0.9])
         )
 
-        data_it = datetime.datetime.strptime(
+        dt_obj = datetime.datetime.strptime(
             spesa["data_inserimento"], "%Y-%m-%d"
-        ).strftime("%d/%m/%Y")
+        )
+        data_it = dt_obj.strftime("%d/%m/%Y")
         stato_attuale = spesa["pagata"]
 
         with col_serv:
@@ -187,7 +192,68 @@ if spese_data:
                     ).eq("id", spesa["id"]).execute()
                     st.rerun()
 
-        # 2. Popover di conferma cancellazione riga
+        # 2. Modifica riga esistente
+        with col_edit:
+            with st.popover("✏️", use_container_width=True):
+                st.markdown("**Modifica Spesa**")
+                
+                # Lista dei servizi per determinare l'indice predefinito
+                servizi_list = [
+                    "Iren Teleriscaldamento",
+                    "Iren Luce",
+                    "Iren Rifiuti",
+                    "Condominio",
+                ]
+                idx_serv = (
+                    servizi_list.index(spesa["servizio"])
+                    if spesa["servizio"] in servizi_list
+                    else 0
+                )
+
+                mod_servizio = st.selectbox(
+                    "Servizio",
+                    servizi_list,
+                    index=idx_serv,
+                    key=f"m_serv_{spesa['id']}",
+                )
+                mod_periodo = st.text_input(
+                    "Periodo",
+                    value=spesa["periodo"],
+                    key=f"m_per_{spesa['id']}",
+                )
+                mod_costo = st.number_input(
+                    "Costo Complessivo (€)",
+                    value=float(spesa["costo_totale"]),
+                    step=0.01,
+                    format="%.2f",
+                    key=f"m_cost_{spesa['id']}",
+                )
+                mod_data = st.date_input(
+                    "Data Inserimento",
+                    value=dt_obj.date(),
+                    format="DD/MM/YYYY",
+                    key=f"m_date_{spesa['id']}",
+                )
+
+                if st.button("Salva Modifiche", key=f"btn_save_mod_{spesa['id']}"):
+                    if not mod_periodo or mod_costo <= 0:
+                        st.error("I campi non possono essere vuoti o uguali a zero.")
+                    else:
+                        mod_quota = round(mod_costo * 0.25, 2)
+                        update_payload = {
+                            "servizio": mod_servizio,
+                            "periodo": mod_periodo,
+                            "costo_totale": mod_costo,
+                            "quota_figlio": mod_quota,
+                            "data_inserimento": str(mod_data),
+                        }
+                        supabase.table("spese").update(update_payload).eq(
+                            "id", spesa["id"]
+                        ).execute()
+                        st.success("Modifica salvata!")
+                        st.rerun()
+
+        # 3. Popover di conferma cancellazione riga
         with col_del:
             with st.popover("🗑️", use_container_width=True):
                 st.write("Eliminare questa spesa?")
